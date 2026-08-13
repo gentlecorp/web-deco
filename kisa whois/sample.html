@@ -1,0 +1,47 @@
+// 무조건 이 파일 안에 있는 whois.php 와 같이 사용
+// 리눅스라면 권한 설정 필수
+<!-- Whois 검색창 사이즈 조절은 알아서 -->
+<div class="whois-box">
+    <input type="text" id="whoisQuery" placeholder="" onkeypress="if(event.key==='Enter') doWhois()">
+    <button onclick="doWhois()">검색창 텍스트</button>
+    <div class="whois-note">설명</div>
+</div>
+  <script>
+async function doWhois() {
+    const q = document.getElementById("whoisQuery").value.trim();
+    if (!q) {
+        alert("검색어를 입력해 주세요");
+        return;
+    }
+
+    try {
+        // ★ whois.php가 있는 실제 웹 경로로 지정
+        // 같은 폴더면 놔두기
+        const res = await fetch("/whois.php?q=" + encodeURIComponent(q));
+        const data = await res.json();
+
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        let msg = "";
+        if (data.response && data.response.body) {
+            const body = data.response.body;
+            msg = body.whois ? JSON.stringify(body.whois, null, 2) : JSON.stringify(body, null, 2);
+        } else if (data.whois) {
+            msg = JSON.stringify(data.whois, null, 2);
+        } else {
+            msg = JSON.stringify(data, null, 2);
+        }
+
+        if (msg.length > 1800) {
+            msg = msg.substring(0, 1800) + "\n\n... (내용 더 있음)"; //substring 값 조절로 표시할 글자 수 조절
+        }
+
+        alert(msg || "결과 없음");
+    } catch (e) {
+        alert("조회 실패\n" + e.message);
+    }
+}
+</script>
