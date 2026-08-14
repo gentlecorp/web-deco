@@ -8,7 +8,7 @@
 async function doWhois() {
     const q = document.getElementById("whoisQuery").value.trim();
     if (!q) {
-        alert("검색어를 입력해");
+        alert("검색어를 입력해 주세요");
         return;
     }
 
@@ -17,7 +17,7 @@ async function doWhois() {
         const text = await res.text();
 
         if (!text) {
-            alert("서버가 빈 응답을 보냄");
+            alert("서버가 빈 응답을 보냈습니다");
             return;
         }
 
@@ -25,7 +25,7 @@ async function doWhois() {
         try {
             data = JSON.parse(text);
         } catch (e) {
-            alert("서버 응답이 JSON이 아님:\n" + text.substring(0, 300));
+            alert("서버 응답이 JSON이 아닙니다:\n" + text.substring(0, 300));
             return;
         }
 
