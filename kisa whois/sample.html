@@ -10,38 +10,185 @@
 async function doWhois() {
     const q = document.getElementById("whoisQuery").value.trim();
     if (!q) {
-        alert("검색어를 입력해 주세요");
+        alert("검색어를 입력해");
         return;
     }
 
     try {
-        // ★ whois.php가 있는 실제 웹 경로로 지정
-        // 같은 폴더면 놔두기
         const res = await fetch("/whois.php?q=" + encodeURIComponent(q));
-        const data = await res.json();
+        const text = await res.text();
+
+        if (!text) {
+            alert("서버가 빈 응답을 보냄");
+            return;
+        }
+
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            alert("서버 응답이 JSON이 아님:\n" + text.substring(0, 300));
+            return;
+        }
 
         if (data.error) {
             alert(data.error);
             return;
         }
 
-        let msg = "";
-        if (data.response && data.response.body) {
-            const body = data.response.body;
-            msg = body.whois ? JSON.stringify(body.whois, null, 2) : JSON.stringify(body, null, 2);
-        } else if (data.whois) {
-            msg = JSON.stringify(data.whois, null, 2);
-        } else {
-            msg = JSON.stringify(data, null, 2);
-        }
+        // 정리된 메시지 만들기
+        const msg = formatWhois(data);
+        alert(msg);
 
-        if (msg.length > 1800) {
-            msg = msg.substring(0, 1800) + "\n\n... (내용 더 있음)"; //substring 값 조절로 표시할 글자 수 조절
-        }
-
-        alert(msg || "결과 없음");
     } catch (e) {
         alert("조회 실패\n" + e.message);
     }
+}
+
+function formatWhois(data) {
+    let whois = null;
+
+    if (data.response && data.response.whois) {
+        whois = data.response.whois;
+    } else if (data.whois) {
+        whois = data.whois;
+    } else if (data.response && data.response.body && data.response.body.whois) {
+        whois = data.response.body.whois;
+    }
+
+    if (!whois) {
+        return "결과 없음\n\n" + JSON.stringify(data, null, 2).substring(0, 800);
+    }
+
+    let lines = [];
+
+    // ── 도메인 ──
+    if (whois.krdomain) {
+        const d = whois.krdomain;
+
+        lines.push("■ 도메인 조회 결과");
+        lines.push("─────────────────");
+        lines.push("도메인   : " + (d.name || "-"));
+        lines.push("등록인   : " + (d.regName || "-"));
+        lines.push("관리자   : " + (d.adminName || "-"));
+        lines.push("관리자메일: " + (d.adminEmail || "-"));
+        lines.push("등록일   : " + (d.regDate || "-"));
+        lines.push("만료일   : " + (d.endDate || "-"));
+        lines.push("최종수정 : " + (d.lastUpdatedDate || "-"));
+        lines.push("상태     : " + (d.domainStatus || "-"));
+        lines.push("정보공개 : " + (d.infoYN === "Y" ? "공개" : "비공개"));
+        lines.push("등록대행 : " + (d.agency || "-"));
+        if (d.agency_url) lines.push("대행 URL : " + d.agency_url);
+        lines.push("DNSSEC   : " + (d.dnssec || "-"));
+
+        // 네임서버
+        const nsList = [];
+        if (d.ns1) nsList.push(d.ns1);
+        if (d.ns2) nsList.push(d.ns2);
+        if (d.ns3) nsList.push(d.ns3);
+        if (d.ns4) nsList.push(d.ns4);
+        if (Array.isArray(d.ns1)) {
+            d.ns1.forEach(n => nsList.push(n));
+        }
+        if (nsList.length > 0) {
+            lines.push("");
+            lines.push("■ 네임서버");
+            lines.push("─────────────────");
+            // 중복 제거
+            [...new Set(nsList)].forEach(ns => lines.push("· " + ns));
+        }
+
+        return lines.join("\n");
+    }
+
+    // ── IP ──
+    lines.push("■ 조회 결과");
+    lines.push("─────────────────");
+    lines.push("조회주소 : " + (whois.query || "-"));
+    lines.push("유형     : " + (whois.queryType || "-"));
+    lines.push("레지스트리: " + (whois.registry || "-"));
+    lines.push("국가코드 : " + (whois.countryCode || "-"));
+    lines.push("");
+
+    const kr = whois.korean || {};
+
+    // ISP 정보
+    if (kr.ISP) {
+        const isp = kr.ISP;
+        const net = isp.netInfo || isp.netinfo || {};
+        const tech = isp.techContact || {};
+
+        lines.push("■ ISP 정보");
+        lines.push("─────────────────");
+        if (net.orgName)   lines.push("기관명   : " + net.orgName);
+        if (net.servName)  lines.push("서비스명 : " + net.servName);
+        if (net.range)     lines.push("IP대역   : " + net.range);
+        if (net.prefix)    lines.push("프리픽스 : " + net.prefix);
+        if (net.addr)      lines.push("주소     : " + net.addr);
+        if (net.zipCode)   lines.push("우편번호 : " + net.zipCode);
+        if (net.regDate)   lines.push("등록일   : " + formatDate(net.regDate));
+        if (tech.name)     lines.push("담당자   : " + tech.name);
+        if (tech.phone)    lines.push("전화     : " + tech.phone);
+        if (tech.email)    lines.push("이메일   : " + tech.email);
+        lines.push("");
+    }
+
+    // 사용자(할당) 정보
+    if (kr.user) {
+        const user = kr.user;
+        const net = user.netInfo || user.netinfo || {};
+        const tech = user.techContact || {};
+
+        lines.push("■ 할당(사용자) 정보");
+        lines.push("─────────────────");
+        if (net.orgName)   lines.push("기관명   : " + net.orgName);
+        if (net.netType)   lines.push("유형     : " + net.netType);
+        if (net.range)     lines.push("IP대역   : " + net.range);
+        if (net.prefix)    lines.push("프리픽스 : " + net.prefix);
+        if (net.addr)      lines.push("주소     : " + net.addr);
+        if (net.zipCode)   lines.push("우편번호 : " + net.zipCode);
+        if (net.regDate)   lines.push("등록일   : " + formatDate(net.regDate));
+        if (tech.name)     lines.push("담당자   : " + tech.name);
+        if (tech.phone)    lines.push("전화     : " + tech.phone);
+        if (tech.email)    lines.push("이메일   : " + tech.email);
+        lines.push("");
+    }
+
+    // 예전 도메인 필드 형식도 대비
+    if (whois.regName || whois.name) {
+        lines.push("■ 도메인 정보");
+        lines.push("─────────────────");
+        if (whois.name)        lines.push("도메인   : " + whois.name);
+        if (whois.regName)     lines.push("등록인   : " + whois.regName);
+        if (whois.adminName)   lines.push("관리자   : " + whois.adminName);
+        if (whois.adminEmail)  lines.push("관리자메일: " + whois.adminEmail);
+        if (whois.regDate)     lines.push("등록일   : " + whois.regDate);
+        if (whois.endDate)     lines.push("만료일   : " + whois.endDate);
+        if (whois.agency)      lines.push("등록대행 : " + whois.agency);
+    }
+
+    if (lines.length <= 6) {
+        lines.push("(상세 정보 부족)");
+        lines.push(JSON.stringify(whois, null, 2).substring(0, 600));
+    }
+
+    return lines.join("\n");
+}
+
+function formatDate(str) {
+    if (!str) return "-";
+    if (/^\d{8}$/.test(str)) {
+        return str.substring(0,4) + "-" + str.substring(4,6) + "-" + str.substring(6,8);
+    }
+    return str;
+}
+
+function formatDate(str) {
+    if (!str) return "-";
+    // 20061106 → 2006-11-06
+    if (/^\d{8}$/.test(str)) {
+        return str.substring(0,4) + "-" + str.substring(4,6) + "-" + str.substring(6,8);
+    }
+    return str;
 }
 </script>
