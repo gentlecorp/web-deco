@@ -3,6 +3,7 @@
 // OPENAPI 코드는 data.go.kr 에서 발급 가능 (자세한건 whois.kr 참고)
 // $DAILY_LIMIT 값 조절 시 일일 한도 조절 가능 (개발 계정일 경우 최대 1만, 이용 계정의 경우 10만 까지 가능.)
 // 일일 한도를 API 계정의 허용 수를 넘어서면 접근거부됨 (반복시 차단)
+// $LOG_FILE 로 로그파일 지정 가능(일일 카운트 측정)
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
